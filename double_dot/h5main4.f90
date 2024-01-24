@@ -1,5 +1,4 @@
 !The programm consist in two parts. One create the dataset and the other ones write in a selection
-!In this version the noise part is added
 
 program h5data
 
@@ -7,13 +6,18 @@ program h5data
   USE occup
   IMPLICIT NONE
   
-  CHARACTER(LEN=16), PARAMETER :: filename = "double_dot(n).h5" ! File name
+  real(kind=8) :: d(4)
+  real(kind=8) :: m(2)
+  real(kind=8) :: Ic(30,30)
+  real(kind=8) :: emin, emax
+  !real(kind=8) :: mu, sigma
+  
+  CHARACTER(LEN=16), PARAMETER :: filename = "double_dot.h5" ! File name
   CHARACTER(LEN=16), PARAMETER :: mdsetname = "voltages"       ! Dataset name
   CHARACTER(LEN=16), PARAMETER :: vdsetname = "gates_w"
   CHARACTER(LEN=16), PARAMETER :: groupname = "dataset"
   CHARACTER(LEN=16), PARAMETER :: v1dsetname = "V1"
   CHARACTER(LEN=16), PARAMETER :: v2dsetname = "V2"
-  CHARACTER(LEN=16), PARAMETER :: ndsetname = "noise"
   
   INTEGER(HSIZE_T), PARAMETER :: dset_size = 6000
   INTEGER(HSIZE_T), PARAMETER :: img_size = 30
@@ -21,16 +25,15 @@ program h5data
   INTEGER(HSIZE_T), PARAMETER :: one = 1 !For avoid kind problems
   INTEGER(HID_T) :: file_id
   INTEGER(HID_T) :: group_id
-  INTEGER(HID_T) :: mdataspace, vdataspace, v1dataspace, v2dataspace, ndataspace
-  INTEGER(HID_T) :: mdset_id, vdset_id, v1dset_id, v2dset_id, ndset_id
-  INTEGER(HID_T) :: mmemspace, vmemspace, nmemspace
+  INTEGER(HID_T) :: mdataspace, vdataspace, v1dataspace, v2dataspace
+  INTEGER(HID_T) :: mdset_id, vdset_id, v1dset_id, v2dset_id
+  INTEGER(HID_T) :: mmemspace, vmemspace
   
   INTEGER(HSIZE_T), DIMENSION(1:3) :: dimsm = (/img_size,img_size,one/)
   INTEGER(HSIZE_T), DIMENSION(1:2) :: dimsv = (/vector_size,one/)
   INTEGER(HSIZE_T), DIMENSION(1) :: dimsv1 = (/img_size/)
   INTEGER(HSIZE_T), DIMENSION(1) :: dimsv2 = (/img_size/)
   REAL, DIMENSION(1:img_size,1:img_size,1) :: mdata                  ! Subset buffer
-  REAL, DIMENSION(1:img_size,1:img_size,1) :: ndata
   REAL, DIMENSION(1:vector_size,1) :: vdata
   REAL, DIMENSION(1:img_size) :: v1data
   REAL, DIMENSION(1:img_size) :: v2data
@@ -56,13 +59,6 @@ program h5data
   INTEGER :: v1rank = 1
   INTEGER :: v2rank = 1
   INTEGER :: error, i, j, k
-  
-  real(kind=8) :: Ic(img_size,img_size)
-  real(kind=8) :: noise(img_size, img_size)
-  real(kind=8) :: d(4)
-  real(kind=8) :: m(2)
-  
-  real(kind=8) :: emin, emax
   
   REAL(HSIZE_T), DIMENSION(1:2) :: mu = (/1.,0./)
   REAL(HSIZE_T), DIMENSION(1:2) :: sigma = (/0.1,0.1/)
@@ -97,12 +93,6 @@ program h5data
   
   CALL h5dwrite_f(v2dset_id, H5T_NATIVE_REAL, v2data, dimsv2, error)
   
-  CALL h5screate_simple_f(mrank, mdimsf, ndataspace, error)
-  
-  CALL h5dcreate_f(file_id, ndsetname, H5T_NATIVE_REAL, ndataspace, &
-       ndset_id, error)
-    
-  
   
   !Create the group
   CALL h5gcreate_f(file_id, groupname, group_id, error)
@@ -130,8 +120,6 @@ program h5data
   CALL h5dclose_f(vdset_id, error)
   CALL h5dclose_f(v1dset_id, error)
   CALL h5dclose_f(v2dset_id, error)
-  CALL h5sclose_f(ndataspace, error)
-  CALL h5dclose_f(ndset_id, error)
   CALL h5fclose_f(file_id, error)
   
   CALL h5close_f(error)
@@ -160,15 +148,12 @@ program h5data
 	  ! Call the function
 	  call ocupaciones(d, Ic)
 	  
-	  call normal_noise(img_size, noise)
-	  
 	  !Write this values in a file directly in the subroutine
 	  
 	  moffset = (/0,0,i/)
 	  voffset = (/0,i/)
 	  
 	  mdata(1:img_size,1:img_size,1) = Ic(1:img_size,1:img_size)
-	  ndata(1:img_size,1:img_size,1) = noise(1:img_size,1:img_size)
           vdata(1:vector_size,1) = d(1:vector_size)
           
           !write(*,*) vdata
@@ -191,25 +176,6 @@ program h5data
 	  CALL h5sclose_f(mdataspace, error)
 	  CALL h5sclose_f(mmemspace, error)
 	  CALL h5dclose_f(mdset_id, error)
-	  
-	  CALL h5dopen_f(file_id, ndsetname, ndset_id, error)
-	  
-	  CALL h5dget_space_f(ndset_id, ndataspace, error)
-	  CALL h5sselect_hyperslab_f(ndataspace, H5S_SELECT_SET_F, &
-	       moffset, mcount, error, mstride, mblock)
-	  
-	  CALL h5screate_simple_f(mrank, dimsm, nmemspace, error)
-
-	  
-	  !CALL h5dwrite_f(mdset_id, H5T_NATIVE_REAL, mdata, dimsm, error, &
-	       !mmemspace, mdataspace)
-	  
-	  CALL h5dwrite_f(ndset_id, H5T_NATIVE_REAL, ndata, dimsm, error, &
-	       nmemspace, ndataspace)
-	  
-	  CALL h5sclose_f(ndataspace, error)
-	  CALL h5sclose_f(nmemspace, error)
-	  CALL h5dclose_f(ndset_id, error)
 	  
 	  !Here vector
 	  CALL h5dopen_f(group_id, vdsetname, vdset_id, error)
