@@ -1,5 +1,5 @@
-# Quantum_Dots
-Parameterization of quantum dots using machine learning
+# Quantum Dots
+## Parameterization of quantum dots using machine learning
 
 This project works on the parameterization of a system of quantum dots.
 
